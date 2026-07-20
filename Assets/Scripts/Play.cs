@@ -41,11 +41,13 @@ public class Play : MonoBehaviour
         
         deckDirectory = PlayerPrefs.GetString("deckDirectory", "");
         deck = PlayerPrefs.GetString("deck", "");
-        getCards(deckDirectory + "/" + deck + ".csv");
+        getCardsHelper(deckDirectory + "/" + deck + ".csv");
     }
 
     void Start() 
     {
+        //negate screen timeout
+        Screen.sleepTimeout = SleepTimeout.NeverSleep; //(since we're basically only using gyro & only touch input resets timeout timer)
         //start timer
         StartCoroutine(timerCoroutine());
     }
@@ -92,13 +94,26 @@ public class Play : MonoBehaviour
         //make sure we don't run out of cards to avoid out of bounds exception
         if (cards.Count == 0) {
             print("RAN OUT OF CARDS"); //debug
-            getCards(deckDirectory + "/" + deck + ".csv");
+            getCardsHelper(deckDirectory + "/" + deck + ".csv");
         }
         string nextCard = "" + cards[Random.Range(0, cards.Count)];
         print("nextCard: " + nextCard); //debug
         return nextCard;
     }
+    
 
+    void getCardsHelper(string deckPath) {
+        
+        switch (PlayerPrefs.GetInt("multi", 666)) {
+            case 1:
+                getCardsMulti(); break;
+            case 0:
+                getCards(deckPath); break;
+            case 666:
+                print("PLAY.GETCARDSHELPER; MUST SPECIFY IF SINGLE-SELECT OR MULTI-SELECT"); break;
+        }
+    
+    }
 
     void getCards(string deckPath)
     {
@@ -110,9 +125,6 @@ public class Play : MonoBehaviour
         //print("fileData: " + fileData); //debug
         splitStringAsCSV(fileData, cards);
 
-        //bodgey fix to first element in CSV not starting with new line
-        //cards[0] = "\n" + cards[0];
-
         //debug
         //print("cards acquired: "); //debug
         foreach (string card in cards) { //debug
@@ -121,6 +133,26 @@ public class Play : MonoBehaviour
 
         //and make sure to set random one to first currentCard value
         currentCard.text = "" + cards[Random.Range(0, cards.Count)];
+    }
+
+    void getCardsMulti()
+    {
+
+        string input = PlayerPrefs.GetString("selectedDecks"); //format: "deck1.deck2.deck3."
+        List<string> output = new List<string>();
+
+        int index = input.IndexOf(".");
+        while (index > 0 && input.Length > 1) {
+            string deck = input.Substring(0, index); //get next chunk of input
+            string deckData = File.ReadAllText(deckDirectory + "/" + deck + ".csv"); //get data from deck
+            splitStringAsCSV(deckData, cards); //add deck's cards to list of all cards
+            input = input.Substring(index + 1); //cut out old chunk & the separator
+            index = input.IndexOf("."); //find starting point of next chunk
+        }
+
+        //and make sure to set random one to first currentCard value
+        currentCard.text = "" + cards[Random.Range(0, cards.Count)];
+
     }
 
     void splitStringAsCSV(string input, List<string> output) 
